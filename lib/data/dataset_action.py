@@ -127,6 +127,201 @@ def human_tracking(x):
         x_new[1,1:] = x[0,1:] * sel + x[1,1:] * (1-sel)
         return x_new
 
+class PoseTorchDataset(torch.utils.data.Dataset):
+    """Some Information about PoseTrain"""
+    def __init__(self, mode, mask, prefix='fix_pickles_01', dual=True, datanum=128):
+        super(PoseTorchDataset, self).__init__()
+        self.dual = dual
+        self.attrs = []
+        self.labels = []
+        self.names = []
+        self.file = []
+        self.prefix = prefix
+        self.input_tensors = []
+        self.mode = mode 
+        self.path = f'train_subset{datanum}.npy' if mode == 'train' else f'test_subset{datanum}.npy'
+        # self.path = 'PD_43.npy' if mode == 'train' else 'sub.npy'
+        self.flag = ''
+        self.model = 'dwpose'
+        self.foot = True
+        self.mask = mask
+        self.process()
+        
+    def process(self):
+        preprocess = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
+        model = self.model
+        flag = self.flag
+        properties = np.load(self.path, allow_pickle=True)
+        label_dict = {}
+        for label, name in properties:
+            label_dict[name] = label
+        # print(label_dict)
+        for j, name in enumerate(label_dict.keys()):
+            for i in range(6):
+                if isinstance(name, str) and name.startswith('HY'):
+                    pickle_path = f'../Pose/split_{model}_res/{self.prefix}{flag}_health/{int(name[2:])}/{int(name[2:])}_{i}.pickle'
+                    with open(pickle_path, 'rb') as file:
+                        attr_dict = pickle.load(file)
+                else:
+                    pickle_path = f'../Pose/split_{model}_res/{self.prefix}{flag}/{name}/{name}_{i}.pickle'
+                    with open(pickle_path, 'rb') as file:
+                        attr_dict = pickle.load(file)
+                if self.model == 'dwpose' and not self.foot: 
+                    attr = [data['bodies']['candidate'] for data in attr_dict \
+                        if not data == {} and data['bodies']['candidate'].shape[0] == 18]
+                    attr = np.concatenate(attr, axis=0).reshape((-1, 18, 2))
+                    attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]), :]
+                elif self.model == 'dwpose' and self.foot:
+                    attr = [np.concatenate([data['bodies']['candidate'], data['foot'][0]], axis=0) for data in attr_dict \
+                        if not data == {} and data['bodies']['candidate'].shape[0] == 18]
+                    attr = np.concatenate(attr, axis=0).reshape((-1, 24, 2))
+                    attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -6, -5, -4, -3, -2, -1]), :]
+                else:
+                    attr = [np.stack([data['x'], data['y'], data['visibility'], data['presence']], axis=-1) for data in attr_dict if not data == {}]
+                    attr = np.stack(attr, axis=0)
+                    attr = attr[:, np.array([x for x in range(11, 33)]), :]
+                    
+                # index_ab = check_abnormal(attr)
+                # if index_ab is not False:
+                #     # print(index_ab)
+                #     if min(index_ab) < 15:
+                #         attr = attr[15:, :, :]
+                #     if max(index_ab) > attr.shape[0] - 15:
+                #         attr = attr[:attr.shape[0] - 15, :, :]
+                
+                # for i in range(2):
+                #     min_val = np.min(attr[:, :, i], axis=0)
+                #     max_val = np.max(attr[:, :, i], axis=0)
+                #     attr[:, :, i] = (attr[:, :, i] - min_val) / (max_val - min_val)    
+                f, n, c = attr.shape
+                frame_nums = 64
+
+                if f <= frame_nums:
+                    pad_frames = frame_nums - f
+                    attr = np.pad(attr, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
+                else:
+                    # start_index = np.random.randint(0, f - frame_nums + 1)
+                    start_index = 0
+                    attr = attr[start_index : start_index + frame_nums, :, :]
+                
+                label = int(label_dict[name])
+                
+                # mark no info as 0
+                attr[attr == -1] = 0
+                
+                # aug
+                # if self.mode == 'train':
+                #     attr = random_move(attr[None, :, :, :])[0]
+                    
+                # attr = normalize_attr_skip_minus_one(attr)
+                # attr = normalize_attr_skip_minus_one(attr)
+                
+                mask = self.mask
+                # print('mask', mask)
+                neck_idx = [0, 1]
+                arm_idx = [2, 3, 4, 5, 6, 7]
+                leg_idx = [8, 9, 10, 11, 12, 13]
+                foot_idx = [14, 15, 16, 17, 18, 19]
+                if mask == 'arm_leg':
+                    attr[:, np.array(neck_idx + foot_idx), :] = 0
+                elif mask == 'leg_foot':
+                    attr[:, np.array(neck_idx + arm_idx), :] = 0
+                elif mask == 'neck':
+                    attr[:, np.array(arm_idx + leg_idx + foot_idx), :] = 0
+                elif mask == 'arm_foot':
+                    attr[:, np.array(neck_idx + leg_idx), :] = 0
+                elif mask == 'leg':
+                    attr[:, np.array(neck_idx + arm_idx + foot_idx), :] = 0
+                elif mask == 'arm':
+                    attr[:, np.array(neck_idx + leg_idx + foot_idx), :] = 0
+                elif mask == 'foot':
+                    attr[:, np.array(neck_idx + leg_idx + arm_idx), :] = 0
+                elif mask == 'neck_foot':
+                    attr[:, np.array(leg_idx + arm_idx), :] = 0
+                elif mask == 'neck_arm':
+                    attr[:, np.array(leg_idx + foot_idx), :] = 0
+                elif mask == 'neck_leg':
+                    attr[:, np.array(arm_idx + foot_idx), :] = 0
+                elif mask == 'neck_arm_leg':
+                    attr[:, np.array(foot_idx), :] = 0
+                elif mask == 'neck_arm_foot':
+                    attr[:, np.array(leg_idx), :] = 0
+                elif mask == 'neck_leg_foot':
+                    attr[:, np.array(arm_idx), :] = 0
+                elif mask == 'arm_leg_foot':
+                    attr[:, np.array(neck_idx), :] = 0
+                elif mask == 'two_point':
+                    attr[:, np.array([i for i in range(10)] + [11, 12] + [i for i in range(14, 20)]), :] = 0
+                # else:
+                #     print('mask not in define')
+                #     return
+                    
+                # add left/right token
+                # if attr[:, np.array([2,3,4])].all() == 0 or sum(np.sign(np.diff(attr[:, 1, 0]))) < 0:
+                #     attr = np.pad(attr, ((0, 0), (0, 1), (0, 0)), 'constant', constant_values=(0, 1))
+                #     # print('from right to left')
+                # elif attr[:, np.array([5, 6, 7])].all() == 0 or sum(np.sign(np.diff(attr[:, 1, 0]))) > 0:
+                #     attr = np.pad(attr, ((0, 0), (0, 1), (0, 0)), 'constant', constant_values=(0, 2))
+                #     # print('from left to right')
+                # else:
+                #     print('error')
+                #     return
+                
+                # filename = pickle_path.replace('.pickle', '_gei.jpg')
+                # input_image = Image.open(filename).convert('L').convert('RGB')
+                # input_tensor = preprocess(input_image)
+                
+                self.attrs.append(torch.Tensor(attr))
+                self.labels.append(label)
+                self.names.append(j * ksplit + i)
+                self.file.append(f'{str(name).strip()}_{i}')
+                # self.input_tensors.append(input_tensor)
+                
+        self.labels = torch.LongTensor(self.labels)
+
+    def aug(self, attrs):
+        aug_rate = torch.rand(1)
+        attrs = norm(attrs)
+        if aug_rate < 0.2:
+            return attrs
+        attrs = attrs.unsqueeze(0)
+        move_rate, scale_rate, flip_rate = torch.rand(1), torch.rand(1), torch.rand(1)
+        if move_rate > 0.6:
+            attrs = move_aug(attrs)
+        if scale_rate > 0.6:
+            attrs = scale_aug(attrs)
+        if flip_rate > 0.6:
+            attrs = flip_aug(attrs)
+        attrs = attrs.squeeze()
+        return attrs
+
+    def shuffle(self, attrs):
+        indices = torch.randperm(attrs.size(0))
+        return attrs[indices]
+
+    def __getitem__(self, index):
+        file = self.file[index]
+        filename, idx = file.split('_')
+        
+        j = random.choice([1, 3, 5]) if int(idx) % 2 == 0 else random.choice([0, 2, 4])
+        j = (int(idx) + 1) % 6 if self.mode == 'test' else j 
+        couple_idx = self.file.index(f'{filename}_{j}')
+        couple_attr = self.attrs[couple_idx]
+        attr = torch.cat([self.attrs[index], couple_attr], dim=0) if self.dual is True else self.attrs[index]
+        return {'attr': attr,
+                'label': self.labels[index],
+                'name': self.names[index],
+                'file': self.file[index]
+                # 'im': self.input_tensors[index]
+                }
+
+    def __len__(self):
+        return len(self.labels)
 class ActionDataset(Dataset):
     def __init__(self, data_path, data_split, n_frames=243, random_move=True, scale_range=[1,1], check_split=True):   # data_split: train/test etc.
         np.random.seed(0)
