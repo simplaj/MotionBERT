@@ -3,4 +3,5 @@ python train_action.py \
 --pretrained checkpoint/pretrain/ \
 --checkpoint checkpoint/action/PD_121 \
 --selection best_epoch.bin \
---datanum 121
+--datanum 121 \
+--print_freq 50

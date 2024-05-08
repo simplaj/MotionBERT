@@ -144,7 +144,7 @@ def train_with_config(args, opts):
     # ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
     # ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
     if not opts.evaluate:
-        pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train, datanum=args.datanum)
+        pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train, datanum=opts.datanum)
         labels = [x['label'] for x in pd_dataset]
         train_idx, val_idx = split_fold10(labels, 0)
 
