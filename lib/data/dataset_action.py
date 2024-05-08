@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+import pickle
 import random
 import copy
 from torch.utils.data import Dataset, DataLoader
@@ -73,6 +74,75 @@ def coco2h36m(x):
     y[:,:,16,:] = x[:,:,10,:]
     return y
     
+def dwpose2h36m(x):
+    '''
+        Input: x (M x T x V x C)
+        
+        dwpose: 
+        0 - nose
+        1 - neck
+        2 - right shoulder
+        3 - right elbow
+        4 - right wrist
+        5 - left shoulder
+        6 - left elbow
+        7 - left wrist
+        8 - right hip
+        9 - right knee
+        10 - right ankle
+        11 - left hip
+        12 - left knee
+        13 - left ankle
+        14 - right eye
+        15 - left eye
+        16 - right ear
+        17 - left ear
+        0 - left big toe
+        1 - left small toe
+        2 - left heel
+        3 - right big toe
+        4 - right small toe
+        5 - right heel 
+        
+        H36M:
+        0: 'root',
+        1: 'rhip',
+        2: 'rkne',
+        3: 'rank',
+        4: 'lhip',
+        5: 'lkne',
+        6: 'lank',
+        7: 'belly',
+        8: 'neck',
+        9: 'nose',
+        10: 'head',
+        11: 'lsho',
+        12: 'lelb',
+        13: 'lwri',
+        14: 'rsho',
+        15: 'relb',
+        16: 'rwri'
+    '''
+    y = np.zeros(x.shape)
+    y[:,:,0,:] = (x[:,:,8,:] + x[:,:,11,:]) * 0.5
+    y[:,:,1,:] = x[:,:,8,:]
+    y[:,:,2,:] = x[:,:,9,:]
+    y[:,:,3,:] = x[:,:,10,:]
+    y[:,:,4,:] = x[:,:,11,:]
+    y[:,:,5,:] = x[:,:,12,:]
+    y[:,:,6,:] = x[:,:,13,:]
+    y[:,:,8,:] = x[:,:,1,:]
+    y[:,:,7,:] = (y[:,:,0,:] + y[:,:,8,:]) * 0.5
+    y[:,:,9,:] = x[:,:,0,:]
+    y[:,:,10,:] = (x[:,:,14,:] + x[:,:,15,:]) * 0.5
+    y[:,:,11,:] = x[:,:,5,:]
+    y[:,:,12,:] = x[:,:,6,:]
+    y[:,:,13,:] = x[:,:,7,:]
+    y[:,:,14,:] = x[:,:,3,:]
+    y[:,:,15,:] = x[:,:,4,:]
+    y[:,:,16,:] = x[:,:,5,:]
+    return y
+    
 def random_move(data_numpy,
                 angle_range=[-10., 10.],
                 scale_range=[0.9, 1.1],
@@ -129,8 +199,10 @@ def human_tracking(x):
 
 class PoseTorchDataset(torch.utils.data.Dataset):
     """Some Information about PoseTrain"""
-    def __init__(self, mode, mask, prefix='fix_pickles_01', dual=True, datanum=128):
+    def __init__(self, mode, mask, random_move, scale_range, prefix='fix_pickles_01', dual=True, datanum=109):
         super(PoseTorchDataset, self).__init__()
+        self.random_move = random_move
+        self.scale_range = scale_range
         self.dual = dual
         self.attrs = []
         self.labels = []
@@ -139,7 +211,7 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         self.prefix = prefix
         self.input_tensors = []
         self.mode = mode 
-        self.path = f'train_subset{datanum}.npy' if mode == 'train' else f'test_subset{datanum}.npy'
+        self.path = f'../PD/Gait_without_dgl/train_subset{datanum}.npy' if mode == 'train' else f'../PD/Gait_without_dgl/test_subset{datanum}.npy'
         # self.path = 'PD_43.npy' if mode == 'train' else 'sub.npy'
         self.flag = ''
         self.model = 'dwpose'
@@ -148,12 +220,7 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         self.process()
         
     def process(self):
-        preprocess = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ])
+        ksplit = 6
         model = self.model
         flag = self.flag
         properties = np.load(self.path, allow_pickle=True)
@@ -164,11 +231,11 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         for j, name in enumerate(label_dict.keys()):
             for i in range(6):
                 if isinstance(name, str) and name.startswith('HY'):
-                    pickle_path = f'../Pose/split_{model}_res/{self.prefix}{flag}_health/{int(name[2:])}/{int(name[2:])}_{i}.pickle'
+                    pickle_path = f'../PD/Pose/split_{model}_res/{self.prefix}{flag}_health/{int(name[2:])}/{int(name[2:])}_{i}.pickle'
                     with open(pickle_path, 'rb') as file:
                         attr_dict = pickle.load(file)
                 else:
-                    pickle_path = f'../Pose/split_{model}_res/{self.prefix}{flag}/{name}/{name}_{i}.pickle'
+                    pickle_path = f'../PD/Pose/split_{model}_res/{self.prefix}{flag}/{name}/{name}_{i}.pickle'
                     with open(pickle_path, 'rb') as file:
                         attr_dict = pickle.load(file)
                 if self.model == 'dwpose' and not self.foot: 
@@ -180,7 +247,7 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                     attr = [np.concatenate([data['bodies']['candidate'], data['foot'][0]], axis=0) for data in attr_dict \
                         if not data == {} and data['bodies']['candidate'].shape[0] == 18]
                     attr = np.concatenate(attr, axis=0).reshape((-1, 24, 2))
-                    attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -6, -5, -4, -3, -2, -1]), :]
+                    # attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -6, -5, -4, -3, -2, -1]), :]
                 else:
                     attr = [np.stack([data['x'], data['y'], data['visibility'], data['presence']], axis=-1) for data in attr_dict if not data == {}]
                     attr = np.stack(attr, axis=0)
@@ -275,8 +342,10 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 # filename = pickle_path.replace('.pickle', '_gei.jpg')
                 # input_image = Image.open(filename).convert('L').convert('RGB')
                 # input_tensor = preprocess(input_image)
+                attr = make_cam(attr[None,:,:,:], (1,1))
+                attr = dwpose2h36m(attr)
                 
-                self.attrs.append(torch.Tensor(attr))
+                self.attrs.append(attr)
                 self.labels.append(label)
                 self.names.append(j * ksplit + i)
                 self.file.append(f'{str(name).strip()}_{i}')
@@ -284,44 +353,27 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 
         self.labels = torch.LongTensor(self.labels)
 
-    def aug(self, attrs):
-        aug_rate = torch.rand(1)
-        attrs = norm(attrs)
-        if aug_rate < 0.2:
-            return attrs
-        attrs = attrs.unsqueeze(0)
-        move_rate, scale_rate, flip_rate = torch.rand(1), torch.rand(1), torch.rand(1)
-        if move_rate > 0.6:
-            attrs = move_aug(attrs)
-        if scale_rate > 0.6:
-            attrs = scale_aug(attrs)
-        if flip_rate > 0.6:
-            attrs = flip_aug(attrs)
-        attrs = attrs.squeeze()
-        return attrs
-
     def shuffle(self, attrs):
         indices = torch.randperm(attrs.size(0))
         return attrs[indices]
 
-    def __getitem__(self, index):
-        file = self.file[index]
-        filename, idx = file.split('_')
-        
-        j = random.choice([1, 3, 5]) if int(idx) % 2 == 0 else random.choice([0, 2, 4])
-        j = (int(idx) + 1) % 6 if self.mode == 'test' else j 
-        couple_idx = self.file.index(f'{filename}_{j}')
-        couple_attr = self.attrs[couple_idx]
-        attr = torch.cat([self.attrs[index], couple_attr], dim=0) if self.dual is True else self.attrs[index]
-        return {'attr': attr,
-                'label': self.labels[index],
-                'name': self.names[index],
-                'file': self.file[index]
-                # 'im': self.input_tensors[index]
-                }
+    def __getitem__(self, idx):
+        motion, label = self.attrs[idx], self.labels[idx] # (M,T,J,C)
+        # print(motion, label)
+        # if self.random_move:
+        #     motion = random_move(motion)
+        # print(motion)
+        # if self.scale_range:
+        #     result = crop_scale(motion, scale_range=self.scale_range)
+        # else:
+        #     result = motion
+        # print(motion, label)
+        print(motion.shape)
+        return motion.astype(np.float32), label
 
     def __len__(self):
         return len(self.labels)
+    
 class ActionDataset(Dataset):
     def __init__(self, data_path, data_split, n_frames=243, random_move=True, scale_range=[1,1], check_split=True):   # data_split: train/test etc.
         np.random.seed(0)
