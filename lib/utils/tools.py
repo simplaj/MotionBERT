@@ -67,3 +67,20 @@ def read_pkl(data_url):
     content = pickle.load(file)
     file.close()
     return content
+
+def split_fold10(labels_ori, fold_idx=0):
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+    ###
+    # print(labels_ori)
+    labels = labels_ori[::ksplit]
+    # print(labels)
+    ###
+    idx_list = []
+    for idx in skf.split(np.zeros(len(labels)), labels):
+        idx_list.append(idx)
+    train_idx, valid_idx = idx_list[fold_idx]
+    ###
+    train_idx = [x * ksplit + i for x in train_idx for i in range(ksplit)]
+    valid_idx = [x * ksplit + i for x in valid_idx for i in range(ksplit)]
+    ###
+    return train_idx, valid_idx
