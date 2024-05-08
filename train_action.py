@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument('-e', '--evaluate', default='', type=str, metavar='FILENAME', help='checkpoint to evaluate (file name)')
     parser.add_argument('-freq', '--print_freq', default=100)
     parser.add_argument('-dn', '--datanum', default=109)
+    parser.add_argument('-kd', '--kidx', default=0)
     parser.add_argument('-ms', '--selection', default='latest_epoch.bin', type=str, metavar='FILENAME', help='checkpoint to finetune (file name)')
     opts = parser.parse_args()
     return opts
@@ -76,7 +77,7 @@ def validate(test_loader, model, criterion, file='temp.txt'):
                     )
                 val_result.append(string)
 
-            if (idx+1) % opts.print_freq == 0:
+            if (idx+1) % int(opts.print_freq) == 0:
                 print('Test: [{0}/{1}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
@@ -146,10 +147,10 @@ def train_with_config(args, opts):
     if not opts.evaluate:
         pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train, datanum=opts.datanum)
         labels = [x['label'] for x in pd_dataset]
-        train_idx, val_idx = split_fold10(labels, 0)
+        train_idx, val_idx = split_fold10(labels, int(opts.kidx))
 
         train_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **trainloader_params)
-        test_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **testloader_params)
+        test_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(val_idx), **testloader_params)
     else:
         pd_dataset = PoseTorchDataset(mode='test', mask=None, random_move=args.random_move, scale_range=args.scale_range_test)
         test_loader = DataLoader(pd_dataset, **testloader_params)
@@ -212,7 +213,7 @@ def train_with_config(args, opts):
                 optimizer.step()    
                 batch_time.update(time.time() - end)
                 end = time.time()
-            if (idx + 1) % opts.print_freq == 0:
+            if (idx + 1) % int(opts.print_freq) == 0:
                 print('Train: [{0}][{1}/{2}]\t'
                       'BT {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'DT {data_time.val:.3f} ({data_time.avg:.3f})\t'
