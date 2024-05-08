@@ -363,8 +363,7 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         indices = torch.randperm(attrs.size(0))
         return attrs[indices]
 
-    def __getitem__(self, idx):
-        motion, label = self.attrs[idx], self.labels[idx] # (M,T,J,C)
+    def __getitem__(self, index):
         # print(motion, label)
         # if self.random_move:
         #     motion = random_move(motion)
@@ -375,7 +374,12 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         #     result = motion
         # print(motion, label)
         # print(motion.shape)
-        return motion.astype(np.float32), label
+        return {'attr': self.attrs[index].astype(np.float32),
+                'label': self.labels[index],
+                'name': self.names[index],
+                'file': self.file[index]
+                # 'im': self.input_tensors[index]
+                }
 
     def __len__(self):
         return len(self.labels)

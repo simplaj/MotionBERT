@@ -35,19 +35,23 @@ def parse_args():
     parser.add_argument('-r', '--resume', default='', type=str, metavar='FILENAME', help='checkpoint to resume (file name)')
     parser.add_argument('-e', '--evaluate', default='', type=str, metavar='FILENAME', help='checkpoint to evaluate (file name)')
     parser.add_argument('-freq', '--print_freq', default=100)
+    parser.add_argument('-dn', '--datanum', default=109)
     parser.add_argument('-ms', '--selection', default='latest_epoch.bin', type=str, metavar='FILENAME', help='checkpoint to finetune (file name)')
     opts = parser.parse_args()
     return opts
 
-def validate(test_loader, model, criterion):
+def validate(test_loader, model, criterion, file='temp.txt'):
     model.eval()
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
     top5 = AverageMeter()
+    val_result = []
     with torch.no_grad():
         end = time.time()
-        for idx, (batch_input, batch_gt) in tqdm(enumerate(test_loader)):
+        for idx, data in tqdm(enumerate(test_loader)):
+            (batch_input, batch_gt) = data['attr'], data['label']
+            name = data['file']
             batch_size = len(batch_input)    
             if torch.cuda.is_available():
                 batch_gt = batch_gt.cuda()
@@ -64,6 +68,13 @@ def validate(test_loader, model, criterion):
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
+            
+            for i in range(output.size(0)):
+                string = "{} {} {}\n".format(
+                    name[i], str(output.data[i].cpu().numpy().tolist()),
+                    str(int(batch_gt[i].cpu().numpy())),
+                    )
+                val_result.append(string)
 
             if (idx+1) % opts.print_freq == 0:
                 print('Test: [{0}/{1}]\t'
@@ -73,6 +84,12 @@ def validate(test_loader, model, criterion):
                       'Acc@5 {top5.val:.3f} ({top5.avg:.3f})\t'.format(
                        idx, len(test_loader), batch_time=batch_time,
                        loss=losses, top1=top1, top5=top5))
+        if not os.path.exists(file):
+            os.mknod(file)
+        with open(file, 'w') as f:
+            for line in val_result:
+                f.write(line)
+                
     return losses.avg, top1.avg, top5.avg
 
 
@@ -127,8 +144,8 @@ def train_with_config(args, opts):
     # ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
     # ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
     if not opts.evaluate:
-        pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train)
-        labels = [x[1] for x in pd_dataset]
+        pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train, datanum=args.datanum)
+        labels = [x['label'] for x in pd_dataset]
         train_idx, val_idx = split_fold10(labels, 0)
 
         train_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **trainloader_params)
@@ -177,7 +194,8 @@ def train_with_config(args, opts):
             model.train()
             end = time.time()
             iters = len(train_loader)
-            for idx, (batch_input, batch_gt) in tqdm(enumerate(train_loader)):    # (N, 2, T, 17, 3)
+            for idx, data in tqdm(enumerate(train_loader)):    # (N, 2, T, 17, 3)
+                (batch_input, batch_gt) = data['attr'], data['label']
                 data_time.update(time.time() - end)
                 batch_size = len(batch_input)
                 if torch.cuda.is_available():
