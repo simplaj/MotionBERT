@@ -57,7 +57,7 @@ def validate(test_loader, model, criterion):
 
             # update metric
             losses.update(loss.item(), batch_size)
-            acc1, acc5 = accuracy(output, batch_gt, topk=(1, 5))
+            acc1, acc5 = accuracy(output, batch_gt, topk=(1, 2))
             top1.update(acc1[0], batch_size)
             top5.update(acc5[0], batch_size)
 
@@ -183,7 +183,7 @@ def train_with_config(args, opts):
                 optimizer.zero_grad()
                 loss_train = criterion(output, batch_gt)
                 losses_train.update(loss_train.item(), batch_size)
-                acc1, acc5 = accuracy(output, batch_gt, topk=(1, 5))
+                acc1, acc5 = accuracy(output, batch_gt, topk=(1, 2))
                 top1.update(acc1[0], batch_size)
                 top5.update(acc5[0], batch_size)
                 loss_train.backward()

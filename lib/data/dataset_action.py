@@ -374,7 +374,7 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         # else:
         #     result = motion
         # print(motion, label)
-        print(motion.shape)
+        # print(motion.shape)
         return motion.astype(np.float32), label
 
     def __len__(self):
