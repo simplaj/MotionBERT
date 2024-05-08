@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from lib.utils.tools import *
 from lib.utils.learning import *
 from lib.model.loss import *
-from lib.data.dataset_action import NTURGBD
+from lib.data.dataset_action import NTURGBD, PoseTorchDataset
 from lib.model.model_action import ActionNet
 
 random.seed(0)
@@ -122,12 +122,15 @@ def train_with_config(args, opts):
           'prefetch_factor': 4,
           'persistent_workers': True
     }
-    data_path = 'data/action/%s.pkl' % args.dataset
-    ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
-    ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
+    # data_path = 'data/action/%s.pkl' % args.dataset
+    # ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
+    # ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
+    pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range)
+    labels = [x[1] for x in pd_dataset]
+    train_idx, val_idx = split_fold10(labels, fold_idx)
 
-    train_loader = DataLoader(ntu60_xsub_train, **trainloader_params)
-    test_loader = DataLoader(ntu60_xsub_val, **testloader_params)
+    train_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **trainloader_params)
+    test_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **testloader_params)
         
     chk_filename = os.path.join(opts.checkpoint, "latest_epoch.bin")
     if os.path.exists(chk_filename):
