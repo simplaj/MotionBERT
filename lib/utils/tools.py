@@ -4,6 +4,7 @@ import pickle
 import yaml
 from easydict import EasyDict as edict
 from typing import Any, IO
+from sklearn.model_selection import StratifiedKFold
 
 ROOT_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..')
 
@@ -69,6 +70,7 @@ def read_pkl(data_url):
     return content
 
 def split_fold10(labels_ori, fold_idx=0):
+    ksplit = 6
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
     ###
     # print(labels_ori)

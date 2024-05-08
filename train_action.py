@@ -15,6 +15,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 
 from lib.utils.tools import *
 from lib.utils.learning import *
@@ -90,7 +91,7 @@ def train_with_config(args, opts):
         else:
             chk_filename = os.path.join(opts.pretrained, opts.selection)
             print('Loading backbone', chk_filename)
-            checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)['model_pos']
+            checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)['model']
             model_backbone = load_pretrained_weights(model_backbone, checkpoint)
     if args.partial_train:
         model_backbone = partial_train_layers(model_backbone, args.partial_train)
@@ -108,7 +109,7 @@ def train_with_config(args, opts):
     print('Loading dataset...')
     trainloader_params = {
           'batch_size': args.batch_size,
-          'shuffle': True,
+        #   'shuffle': True,
           'num_workers': 8,
           'pin_memory': True,
           'prefetch_factor': 4,
@@ -116,7 +117,7 @@ def train_with_config(args, opts):
     }
     testloader_params = {
           'batch_size': args.batch_size,
-          'shuffle': False,
+        #   'shuffle': False,
           'num_workers': 8,
           'pin_memory': True,
           'prefetch_factor': 4,
@@ -125,9 +126,9 @@ def train_with_config(args, opts):
     # data_path = 'data/action/%s.pkl' % args.dataset
     # ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
     # ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
-    pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range)
+    pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train)
     labels = [x[1] for x in pd_dataset]
-    train_idx, val_idx = split_fold10(labels, fold_idx)
+    train_idx, val_idx = split_fold10(labels, 0)
 
     train_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **trainloader_params)
     test_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **testloader_params)

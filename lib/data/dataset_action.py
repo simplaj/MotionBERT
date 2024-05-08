@@ -141,7 +141,7 @@ def dwpose2h36m(x):
     y[:,:,14,:] = x[:,:,3,:]
     y[:,:,15,:] = x[:,:,4,:]
     y[:,:,16,:] = x[:,:,5,:]
-    return y
+    return y[:,:,:17,:]
     
 def random_move(data_numpy,
                 angle_range=[-10., 10.],
@@ -247,6 +247,8 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                     attr = [np.concatenate([data['bodies']['candidate'], data['foot'][0]], axis=0) for data in attr_dict \
                         if not data == {} and data['bodies']['candidate'].shape[0] == 18]
                     attr = np.concatenate(attr, axis=0).reshape((-1, 24, 2))
+                    confi = [x['bodies']['confi'] for x in attr_dict if not x == {} and x['bodies']['candidate'].shape[0] == 18]
+                    confi = np.concatenate(confi, axis=0).reshape((-1, 18, 1))
                     # attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -6, -5, -4, -3, -2, -1]), :]
                 else:
                     attr = [np.stack([data['x'], data['y'], data['visibility'], data['presence']], axis=-1) for data in attr_dict if not data == {}]
@@ -271,10 +273,12 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 if f <= frame_nums:
                     pad_frames = frame_nums - f
                     attr = np.pad(attr, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
+                    confi = np.pad(confi, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
                 else:
                     # start_index = np.random.randint(0, f - frame_nums + 1)
                     start_index = 0
                     attr = attr[start_index : start_index + frame_nums, :, :]
+                    confi = confi[start_index : start_index + frame_nums, :, :]
                 
                 label = int(label_dict[name])
                 
@@ -344,6 +348,8 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 # input_tensor = preprocess(input_image)
                 attr = make_cam(attr[None,:,:,:], (1,1))
                 attr = dwpose2h36m(attr)
+                confi = dwpose2h36m(confi[None,:,:,:])
+                attr = np.concatenate((attr, confi), axis=-1)
                 
                 self.attrs.append(attr)
                 self.labels.append(label)
