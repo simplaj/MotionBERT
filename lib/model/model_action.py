@@ -52,6 +52,7 @@ class ActionNet(nn.Module):
         super(ActionNet, self).__init__()
         self.backbone = backbone
         self.feat_J = num_joints
+        self.proj = nn.Linear(20, 17)
         if version=='class':
             self.head = ActionHeadClassification(dropout_ratio=dropout_ratio, dim_rep=dim_rep, num_classes=num_classes, num_joints=num_joints)
         elif version=='embed':
@@ -63,6 +64,8 @@ class ActionNet(nn.Module):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
+        x = x.transpose(-1, -2)
+        x = self.proj(x).transpose(-1, -2)
         N, M, T, J, C = x.shape
         x = x.reshape(N*M, T, J, C)        
         feat = self.backbone.get_representation(x)

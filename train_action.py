@@ -168,6 +168,7 @@ def train_with_config(args, opts):
         optimizer = optim.AdamW(
             [     {"params": filter(lambda p: p.requires_grad, model.module.backbone.parameters()), "lr": args.lr_backbone},
                   {"params": filter(lambda p: p.requires_grad, model.module.head.parameters()), "lr": args.lr_head},
+                  {"params": filter(lambda p: p.requires_grad, model.module.proj.parameters()), "lr": args.lr_head},
             ],      lr=args.lr_backbone, 
                     weight_decay=args.weight_decay
         )

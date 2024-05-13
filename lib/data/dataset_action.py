@@ -239,17 +239,20 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                     with open(pickle_path, 'rb') as file:
                         attr_dict = pickle.load(file)
                 if self.model == 'dwpose' and not self.foot: 
-                    attr = [data['bodies']['candidate'] for data in attr_dict \
-                        if not data == {} and data['bodies']['candidate'].shape[0] == 18]
-                    attr = np.concatenate(attr, axis=0).reshape((-1, 18, 2))
-                    attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]), :]
-                elif self.model == 'dwpose' and self.foot:
                     attr = [np.concatenate([data['bodies']['candidate'], data['foot'][0]], axis=0) for data in attr_dict \
                         if not data == {} and data['bodies']['candidate'].shape[0] == 18]
                     attr = np.concatenate(attr, axis=0).reshape((-1, 24, 2))
                     confi = [x['bodies']['confi'] for x in attr_dict if not x == {} and x['bodies']['candidate'].shape[0] == 18]
                     confi = np.concatenate(confi, axis=0).reshape((-1, 18, 1))
                     # attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -6, -5, -4, -3, -2, -1]), :]
+                elif self.model == 'dwpose' and self.foot:
+                    attr = [np.concatenate([data['bodies']['candidate'], data['foot'][0]], axis=0) for data in attr_dict \
+                        if not data == {} and data['bodies']['candidate'].shape[0] == 18]
+                    attr = np.concatenate(attr, axis=0).reshape((-1, 24, 2))
+                    confi = [x['bodies']['confi'] for x in attr_dict if not x == {} and x['bodies']['candidate'].shape[0] == 18]
+                    confi = np.concatenate(confi, axis=0).reshape((-1, 18, 1))
+                    attr = attr[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -6, -5, -4, -3, -2, -1]), :]
+                    confi = confi[:, np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]), :]
                 else:
                     attr = [np.stack([data['x'], data['y'], data['visibility'], data['presence']], axis=-1) for data in attr_dict if not data == {}]
                     attr = np.stack(attr, axis=0)
@@ -346,10 +349,16 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 # filename = pickle_path.replace('.pickle', '_gei.jpg')
                 # input_image = Image.open(filename).convert('L').convert('RGB')
                 # input_tensor = preprocess(input_image)
-                attr = make_cam(attr[None,:,:,:], (1,1))
-                attr = dwpose2h36m(attr)
-                confi = dwpose2h36m(confi[None,:,:,:])
-                attr = np.concatenate((attr, confi), axis=-1)
+                if not self.foot:
+                    attr = make_cam(attr[None,:,:,:], (1,1))
+                    attr = dwpose2h36m(attr)
+                    confi = dwpose2h36m(confi[None,:,:,:])
+                    attr = np.concatenate((attr, confi), axis=-1)
+                else:
+                    attr = attr[None,:,:,:]
+                    confi = np.concatenate([confi, np.ones((frame_nums, 6, 1))*0.5], axis=1)[None,:,:,:]
+                    attr = np.concatenate((attr, confi), axis=-1)
+                    
                 
                 self.attrs.append(attr)
                 self.labels.append(label)
