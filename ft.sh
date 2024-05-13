@@ -3,7 +3,7 @@ for datanum in 109 121 128 ; do
         python train_action.py \
         --config configs/action/MB_ft_NTU60_xsub.yaml \
         --pretrained checkpoint/pretrain/ \
-        --checkpoint checkpoint/action/PD_109 \
+        --checkpoint checkpoint/action/PD_$datanum/$kidx \
         --selection best_epoch.bin \
         --datanum $datanum \
         --print_freq 50 \
