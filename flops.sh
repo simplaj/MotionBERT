@@ -1,12 +1,8 @@
-for datanum in 109 121 128 ; do
-    for kidx in 0 1 2 3 4; do
-        python train_action.py \
+python flops.py \
         --config configs/action/MB_ft_NTU60_xsub.yaml \
         --pretrained checkpoint/pretrain/ \
         --checkpoint checkpoint/action/PD_foot_$datanum/$kidx \
         --selection best_epoch.bin \
-        --datanum $datanum \
+        --datanum 1 \
         --print_freq 50 \
-        --kidx $kidx
-    done
-done
+        --kidx 1

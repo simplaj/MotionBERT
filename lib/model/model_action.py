@@ -64,8 +64,8 @@ class ActionNet(nn.Module):
         '''
             Input: (N, M x T x 17 x 3) 
         '''
-        x = x.transpose(-1, -2)
-        x = self.proj(x).transpose(-1, -2)
+        # x = x.transpose(-1, -2)
+        # x = self.proj(x).transpose(-1, -2)
         N, M, T, J, C = x.shape
         x = x.reshape(N*M, T, J, C)        
         feat = self.backbone.get_representation(x)
