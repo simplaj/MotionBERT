@@ -211,11 +211,11 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         self.prefix = prefix
         self.input_tensors = []
         self.mode = mode 
-        self.path = f'../PD/Gait_without_dgl/train_subset{datanum}.npy' if mode == 'train' else f'../PD/Gait_without_dgl/test_subset{datanum}.npy'
+        self.path = f'../PD/Gait_without_dgl/train_subset{datanum}_vote.npy' if mode == 'train' else f'../PD/Gait_without_dgl/test_subset{datanum}_vote.npy'
         # self.path = 'PD_43.npy' if mode == 'train' else 'sub.npy'
         self.flag = ''
         self.model = 'dwpose'
-        self.foot = True
+        self.foot = False #True
         self.mask = mask
         self.process()
         

@@ -27,6 +27,14 @@ random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
 
+distribute = True
+
+if distribute:
+    torch.distributed.init_process_group(backend="nccl")
+    local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(local_rank)
+    device = torch.device("cuda", local_rank)
+    
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/pretrain.yaml", help="Path to the config file.")
@@ -117,9 +125,13 @@ def train_with_config(args, opts):
     model = ActionNet(backbone=model_backbone, dim_rep=args.dim_rep, num_classes=args.action_classes, dropout_ratio=args.dropout_ratio, version=args.model_version, hidden_dim=args.hidden_dim, num_joints=args.num_joints)
     criterion = torch.nn.CrossEntropyLoss()
     if torch.cuda.is_available():
-        model = nn.DataParallel(model)
         model = model.cuda()
-        criterion = criterion.cuda() 
+        if distribute:
+            model = torch.nn.parallel.DistributedDataParallel(model,
+                                                    device_ids=[local_rank],
+                                                    output_device=local_rank,
+                                                    find_unused_parameters=True)
+        criterion = criterion.cuda()
     best_acc = 0
     model_params = 0
     for parameter in model.parameters():

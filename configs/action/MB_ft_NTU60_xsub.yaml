@@ -4,8 +4,8 @@ partial_train: null
 
 # Traning 
 epochs: 300
-batch_size: 4
-lr_backbone: 0.000005
+batch_size: 32
+lr_backbone: 0.00002
 lr_head: 0.0005
 weight_decay: 0.01
 lr_decay: 0.99
