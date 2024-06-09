@@ -15,8 +15,8 @@ def merge(dir_path, mode):
 
 if __name__ == '__main__':
     # for datanum in [109, 121, 128]:
-    #     for mode in ['val', 'test']:
-    #         merge(f'/home/tzh/Project/MotionBERT/checkpoint/action/PD_{datanum}', mode)
-    ds = PoseTorchDataset(mode='train', mask=None, random_move=False, scale_range=[2,2])
-    for d in ds:
-        print(d['attr'])
+    for mode in ['val', 'test']:
+        merge(f'/home/tzh/Project/MotionBERT/checkpoint/action/0608_PD_foot_120', mode)
+    # ds = PoseTorchDataset(mode='train', mask=None, random_move=False, scale_range=[2,2])
+    # for d in ds:
+    #     print(d['attr'])

@@ -27,7 +27,7 @@ random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
 
-distribute = True
+distribute = False 
 
 if distribute:
     torch.distributed.init_process_group(backend="nccl")
@@ -131,6 +131,8 @@ def train_with_config(args, opts):
                                                     device_ids=[local_rank],
                                                     output_device=local_rank,
                                                     find_unused_parameters=True)
+        else:
+            model = nn.DataParallel(model)
         criterion = criterion.cuda()
     best_acc = 0
     model_params = 0
@@ -173,8 +175,12 @@ def train_with_config(args, opts):
     if opts.resume or opts.evaluate:
         chk_filename = opts.evaluate if opts.evaluate else opts.resume
         print('Loading checkpoint', chk_filename)
-        checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
-        model.load_state_dict(checkpoint['model'], strict=True)
+        state_dict = torch.load(chk_filename, map_location=lambda storage, loc: storage)['model']
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            name = k.replace('module.', '')
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict, strict=True)
     
     if not opts.evaluate:
         optimizer = optim.AdamW(
