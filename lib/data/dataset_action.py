@@ -179,7 +179,49 @@ def random_move(data_numpy,
         new_xy[1] += t_y[i_frame]
         data_numpy[0:2, i_frame, :, :] = new_xy.reshape(2, V, M)
     data_numpy = np.transpose(data_numpy, (3,1,2,0)) # C,T,V,M -> M,T,V,C
-    return data_numpy    
+    return data_numpy  
+
+
+def random_move_(data_numpy, angle_range=[-6., 6.], scale_range=[0.7, 1.3], transform_range=[-0.2, 0.2], move_time_candidate=[1]):
+    data_numpy = np.transpose(data_numpy, (3, 1, 2, 0))  # M,T,V,C-> C,T,V,M
+    C, T, V, M = data_numpy.shape
+    move_time = random.choice(move_time_candidate)
+    node = np.arange(0, T, T * 1.0 / move_time).round().astype(int)
+    node = np.append(node, T)
+    num_node = len(node)
+    angle = np.random.uniform(angle_range[0], angle_range[1], 1)
+    scale = np.random.uniform(scale_range[0], scale_range[1], 1)
+    trans = np.random.uniform(transform_range[0], transform_range[1], 1)
+    A = np.random.uniform(angle, angle, num_node)
+    S = np.random.uniform(scale, scale, num_node)
+    T_x = np.random.uniform(trans, trans, num_node)
+    T_y = np.random.uniform(trans, trans, num_node)
+    a = np.zeros(T)
+    s = np.zeros(T)
+    t_x = np.zeros(T)
+    t_y = np.zeros(T)
+    # linspace
+    for i in range(num_node - 1):
+        a[node[i]:node[i + 1]] = np.linspace(
+            A[i], A[i + 1], node[i + 1] - node[i]) * np.pi / 180
+        s[node[i]:node[i + 1]] = np.linspace(S[i], S[i + 1], node[i + 1] - node[i])
+        t_x[node[i]:node[i + 1]] = np.linspace(T_x[i], T_x[i + 1], node[i + 1] - node[i])
+        t_y[node[i]:node[i + 1]] = np.linspace(T_y[i], T_y[i + 1], node[i + 1] - node[i])
+    theta = np.array([[np.cos(a) * s, -np.sin(a) * s],
+                      [np.sin(a) * s, np.cos(a) * s]])
+    # perform transformation
+    for i_frame in range(T):
+        xy = data_numpy[0:2, i_frame, :, :]
+        mask = (xy != 0)  # Create a mask for non-padding values
+        new_xy = np.dot(theta[:, :, i_frame], xy.reshape(2, -1))
+        new_xy[0] += t_x[i_frame]
+        new_xy[1] += t_y[i_frame]
+        # Only update non-padding values
+        data_numpy[0:2, i_frame, :, :] = np.where(mask, new_xy.reshape(2, V, M), xy)
+    
+    data_numpy = np.transpose(data_numpy, (3, 1, 2, 0))  # C,T,V,M -> M,T,V,C
+    return data_numpy
+  
 
 def human_tracking(x):
     M, T = x.shape[:2]
@@ -211,7 +253,7 @@ class PoseTorchDataset(torch.utils.data.Dataset):
         self.prefix = prefix
         self.input_tensors = []
         self.mode = mode 
-        self.path = f'../PD/Gait_without_dgl/train_subset{datanum}_vote.npy' if mode == 'train' else f'../PD/Gait_without_dgl/test_subset{datanum}_vote.npy'
+        self.path = f'../PD/Gait_without_dgl/train_subset{datanum}_vote.npy' if not mode == 'test' else f'../PD/Gait_without_dgl/test_subset{datanum}_vote.npy'
         # self.path = 'PD_43.npy' if mode == 'train' else 'sub.npy'
         self.flag = ''
         self.model = 'dwpose'
@@ -278,8 +320,8 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                     attr = np.pad(attr, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
                     confi = np.pad(confi, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
                 else:
-                    # start_index = np.random.randint(0, f - frame_nums + 1)
-                    start_index = 0
+                    start_index = np.random.randint(0, f - frame_nums + 1)
+                    # start_index = 0
                     attr = attr[start_index : start_index + frame_nums, :, :]
                     confi = confi[start_index : start_index + frame_nums, :, :]
                 
@@ -289,8 +331,8 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 attr[attr == -1] = 0
                 
                 # aug
-                # if self.mode == 'train':
-                #     attr = random_move(attr[None, :, :, :])[0]
+                if self.mode == 'train':
+                    attr = random_move_(attr[None, :, :, :])[0]
                     
                 # attr = normalize_attr_skip_minus_one(attr)
                 # attr = normalize_attr_skip_minus_one(attr)
