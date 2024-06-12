@@ -160,11 +160,12 @@ def train_with_config(args, opts):
     # ntu60_xsub_train = NTURGBD(data_path=data_path, data_split=args.data_split+'_train', n_frames=args.clip_len, random_move=args.random_move, scale_range=args.scale_range_train)
     # ntu60_xsub_val = NTURGBD(data_path=data_path, data_split=args.data_split+'_val', n_frames=args.clip_len, random_move=False, scale_range=args.scale_range_test)
     pd_dataset = PoseTorchDataset(mode='train', mask=None, random_move=args.random_move, scale_range=args.scale_range_train, datanum=opts.datanum)
+    pd_dataset_val = PoseTorchDataset(mode='val', mask=None, random_move=args.random_move, scale_range=args.scale_range_train, datanum=opts.datanum)
     labels = [x['label'] for x in pd_dataset]
     train_idx, val_idx = split_fold10(labels, int(opts.kidx))
 
     train_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(train_idx), **trainloader_params)
-    test_loader = DataLoader(pd_dataset, sampler=SubsetRandomSampler(val_idx), **testloader_params)
+    test_loader = DataLoader(pd_dataset_val, sampler=SubsetRandomSampler(val_idx), **testloader_params)
     if opts.test:
         pd_dataset = PoseTorchDataset(mode='test', mask=None, random_move=args.random_move, scale_range=args.scale_range_test, datanum=opts.datanum)
         test_loader = DataLoader(pd_dataset, **testloader_params)
