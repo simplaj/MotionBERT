@@ -131,7 +131,7 @@ def train_with_config(args, opts):
                                                     device_ids=[local_rank],
                                                     output_device=local_rank,
                                                     find_unused_parameters=True)
-        else:
+        elif not opts.evaluate:
             model = nn.DataParallel(model)
         criterion = criterion.cuda()
     best_acc = 0
