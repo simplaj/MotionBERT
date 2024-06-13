@@ -320,8 +320,8 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                     attr = np.pad(attr, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
                     confi = np.pad(confi, ((0, pad_frames), (0, 0), (0, 0)), 'constant', constant_values=(0, 0))
                 else:
-                    start_index = np.random.randint(0, f - frame_nums + 1)
-                    # start_index = 0
+                    # start_index = np.random.randint(0, f - frame_nums + 1)
+                    start_index = 0
                     attr = attr[start_index : start_index + frame_nums, :, :]
                     confi = confi[start_index : start_index + frame_nums, :, :]
                 
@@ -331,8 +331,8 @@ class PoseTorchDataset(torch.utils.data.Dataset):
                 attr[attr == -1] = 0
                 
                 # aug
-                if self.mode == 'train':
-                    attr = random_move_(attr[None, :, :, :])[0]
+                # if self.mode == 'train':
+                #     attr = random_move_(attr[None, :, :, :])[0]
                     
                 # attr = normalize_attr_skip_minus_one(attr)
                 # attr = normalize_attr_skip_minus_one(attr)

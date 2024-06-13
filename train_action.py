@@ -27,7 +27,7 @@ random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
 
-distribute = False 
+distribute = True
 
 if distribute:
     torch.distributed.init_process_group(backend="nccl")
